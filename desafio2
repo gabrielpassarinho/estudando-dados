@@ -1,0 +1,123 @@
+-- (Query 1) Gênero dos leads
+-- Colunas: gênero, leads(#)
+with total_leads as (select count(customer_id) from sales.customers)
+select
+	count(c.customer_id)::float/(select * from total_leads)::float as porcetagem_de_leads,
+	ib.gender as genero
+from sales.customers as c
+left join temp_tables.ibge_genders as ib
+	on lower(ib.first_name) = lower(c.first_name)
+group by genero;
+	
+
+
+-- (Query 2) Status profissional dos leads
+-- Colunas: status profissional, leads (%)
+with total_leads as (select count(customer_id) from sales.customers)
+select
+	professional_status as status_profissional,
+	count(customer_id)::float/(select * from total_leads)::float as porcetagem_de_leads
+from sales.customers 
+group by professional_status
+order by porcetagem_de_leads desc;
+
+
+-- (Query 3) Faixa etária dos leads
+-- Colunas: faixa etária, leads (%)
+with total_leads as (select count(customer_id) from sales.customers),
+faixa_etaria as (
+select
+	customer_id,
+	birth_date,
+	(current_date - birth_date)/365 as idade,
+	case 
+		when (current_date - birth_date)/365 between 0 and 20 then '0-20'
+		when (current_date - birth_date)/365 between 20 and 40 then '20-40'
+		when (current_date - birth_date)/365 between 40 and 60 then '40-60'
+		when (current_date - birth_date)/365 between 60 and 80 then '60-80'
+		else '80+'
+	end as faixa_etaria
+from sales.customers
+order by birth_date desc
+)
+select
+	fe.faixa_etaria as faixa_etaria,
+	count(c.customer_id)::float/(select * from total_leads)::float as porcetagem_de_leads
+from sales.customers as c
+left join faixa_etaria as fe
+	on c.customer_id = fe.customer_id
+group by fe.faixa_etaria
+order by porcetagem_de_leads desc;
+
+-- (Query 4) Faixa salarial dos leads
+-- Colunas: faixa salarial, leads (%), ordem
+with total_leads as (select count(customer_id) from sales.customers),
+faixa_salarial as (
+select
+	customer_id,
+	case 
+		when income <= 5000 then 'f1: 0-5k'
+		when income <= 10000 then 'f2: 5k-10k'
+		when income <= 15000 then 'f3: 10k-15k'
+		when income <= 20000 then 'f4: 15k-20k'
+		else 'f5: 20k+'
+	end as faixa_salarial
+from sales.customers
+)
+select
+	fe.faixa_salarial as faixa_salarial,
+	count(c.customer_id)::float/(select * from total_leads)::float as porcetagem_de_leads
+from sales.customers as c
+left join faixa_salarial as fe
+	on c.customer_id = fe.customer_id
+group by fe.faixa_salarial
+order by faixa_salarial;
+
+
+-- (Query 5) Classificação dos veículos visitados
+-- Colunas: classificação do veículo, veículos visitados (#)
+-- Regra de negócio: Veículos novos tem até 2 anos e seminovos acima de 2 anos
+select 
+	count(f.visit_id) as visitas, 
+	case
+		when extract(year from f.visit_page_date)::integer - p.model_year::integer <= 2 then 'novo'
+		else 'seminovo'
+	end as classificacao
+from sales.funnel as f
+left join sales.products as p
+	on f.product_id = p.product_id
+group by classificacao
+order by visitas desc;
+
+-- (Query 6) Idade dos veículos visitados
+-- Colunas: Idade do veículo, veículos visitados (%), ordem
+select
+	case 
+		when extract(year from f.visit_page_date)::integer - p.model_year::integer > 0 then  extract(year from f.visit_page_date)::integer - p.model_year::integer 
+	 	else 0
+	end as idade,
+	count(f.visit_id)
+from sales.funnel as f
+left join sales.products as p
+	on f.product_id = p.product_id
+group by idade
+order by idade;
+
+
+-- (Query 7) Veículos mais visitados por marca
+-- Colunas: brand, model, visitas (#)
+select
+	p.brand,
+	p.model,
+	count(f.visit_id) as visitas
+from sales.funnel as f
+left join sales.products as p
+	on f.product_id = p.product_id 
+group by p.brand, p.model
+order by p.brand, p.model, visitas
+
+
+
+
+
+
